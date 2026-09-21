@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, {useRef, useState, useEffect} from 'react';
 import {
+  InteractionManager,
   Platform,
   View,
   TextInput,
@@ -7,13 +8,13 @@ import {
   StyleSheet,
   Button,
   Switch,
-  TouchableOpacity,
   ScrollView,
   PermissionsAndroid,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { EventRegister } from 'react-native-event-listeners';
+import {EventRegister} from 'react-native-event-listeners';
 import RNFS from 'react-native-fs';
+import {Focusable, isTV, OVERSCAN, tvFontScale, tvPadding} from './tv';
 
 interface MainWindowProps {
   dsIP: string;
@@ -31,8 +32,10 @@ interface MainWindowProps {
   updateDsIP: (dsIP: string) => void;
   updateJpegQuality: (jpegQuality: number) => void;
   updateCpuLimit: (cpuLimit: number) => void;
-  // Modified navigateToStreamWindow accepts a mode: 'top' | 'bottom' | 'both'
-  navigateToStreamWindow: (mode: 'top' | 'bottom' | 'both', showFps: boolean) => void;
+  navigateToStreamWindow: (
+    mode: 'top' | 'bottom' | 'both',
+    showFps: boolean,
+  ) => void;
   recordingEnabled: boolean;
   setRecordingEnabled: (enabled: boolean) => void;
   hzModEnabled: boolean;
@@ -43,32 +46,56 @@ interface MainWindowProps {
   hzDisconnected: boolean;
 }
 
-const MainWindow: React.FC<MainWindowProps> = (props) => {
-  // Local state with defaults coming from props.
+const MainWindow: React.FC<MainWindowProps> = props => {
   const [dsIP, setDsIP] = useState<string>(props.dsIP);
   const [qosValue, setQosValue] = useState<string>(props.qosValue.toString());
-  const [jpegQuality, setJpegQuality] = useState<string>(props.jpegQuality.toString());
+  const [jpegQuality, setJpegQuality] = useState<string>(
+    props.jpegQuality.toString(),
+  );
   const [priorityFactor, setPriorityFactor] = useState<number>(props.priFact);
-  const [screenPriority, setScreenPriority] = useState<number>(1); // Default to Top
+  const [screenPriority, setScreenPriority] = useState<number>(1);
   const [showFps, setShowFps] = useState<boolean>(false);
-  // New state for toggling both view mode.
-  // If HzMod is enabled, bothViewEnabled is forced to false.
   const [bothViewEnabled, setBothViewEnabled] = useState<boolean>(false);
 
-  // Load persisted settings from AsyncStorage when the component mounts.
+  const ipInputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (!isTV) {
+      return;
+    }
+    const task = InteractionManager.runAfterInteractions(() => {
+      ipInputRef.current?.focus();
+    });
+    return () => task.cancel();
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
         const savedSettings = await AsyncStorage.getItem('mainWindowSettings');
         if (savedSettings) {
           const settings = JSON.parse(savedSettings);
-          if (settings.dsIP) setDsIP(settings.dsIP);
-          if (settings.qosValue) setQosValue(settings.qosValue);
-          if (settings.jpegQuality) setJpegQuality(settings.jpegQuality);
-          if (settings.priorityFactor || settings.priorityFactor === 0) setPriorityFactor(settings.priorityFactor);
-          if (settings.screenPriority || settings.screenPriority === 0) setScreenPriority(settings.screenPriority);
-          if (settings.showFps !== undefined) setShowFps(settings.showFps);
-          if (settings.bothViewEnabled !== undefined) setBothViewEnabled(settings.bothViewEnabled);
+          if (settings.dsIP) {
+            setDsIP(settings.dsIP);
+          }
+          if (settings.qosValue) {
+            setQosValue(settings.qosValue);
+          }
+          if (settings.jpegQuality) {
+            setJpegQuality(settings.jpegQuality);
+          }
+          if (settings.priorityFactor || settings.priorityFactor === 0) {
+            setPriorityFactor(settings.priorityFactor);
+          }
+          if (settings.screenPriority || settings.screenPriority === 0) {
+            setScreenPriority(settings.screenPriority);
+          }
+          if (settings.showFps !== undefined) {
+            setShowFps(settings.showFps);
+          }
+          if (settings.bothViewEnabled !== undefined) {
+            setBothViewEnabled(settings.bothViewEnabled);
+          }
         }
       } catch (error) {
         console.log('Error loading mainWindowSettings:', error);
@@ -76,7 +103,6 @@ const MainWindow: React.FC<MainWindowProps> = (props) => {
     })();
   }, []);
 
-  // Save local settings to AsyncStorage whenever they change.
   useEffect(() => {
     const settings = {
       dsIP,
@@ -87,35 +113,42 @@ const MainWindow: React.FC<MainWindowProps> = (props) => {
       showFps,
       bothViewEnabled,
     };
-    AsyncStorage.setItem('mainWindowSettings', JSON.stringify(settings)).catch((error) =>
-      console.error('Failed to save mainWindowSettings:', error),
+    AsyncStorage.setItem('mainWindowSettings', JSON.stringify(settings)).catch(
+      error => console.error('Failed to save mainWindowSettings:', error),
     );
-  }, [dsIP, qosValue, jpegQuality, priorityFactor, screenPriority, showFps, bothViewEnabled]);
+  }, [
+    dsIP,
+    qosValue,
+    jpegQuality,
+    priorityFactor,
+    screenPriority,
+    showFps,
+    bothViewEnabled,
+  ]);
 
-  // Request storage permission on Android.
   useEffect(() => {
     if (Platform.OS === 'android') {
-      hasAndroidPermission().then((hasPermission) => {
+      hasAndroidPermission().then(hasPermission => {
         if (!hasPermission) {
           console.log('Storage permission denied by user.');
         }
       });
     }
   }, []);
-  
+
   async function hasAndroidPermission() {
     if (Number(Platform.Version) >= 33) {
       return true;
     }
-  
+
     const permission = PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE;
-  
+
     const hasPermission = await PermissionsAndroid.check(permission);
     if (hasPermission) {
       return true;
     }
-  
-    const status = await PermissionsAndroid.request(permission,  {
+
+    const status = await PermissionsAndroid.request(permission, {
       title: 'Storage Permission',
       message: 'App needs access to your storage to save recordings',
       buttonNeutral: 'Ask Me Later',
@@ -124,13 +157,13 @@ const MainWindow: React.FC<MainWindowProps> = (props) => {
     });
     return status === 'granted';
   }
-  
+
   useEffect(() => {
     const handleStateChanged = (state: string) => {
       console.log('Stream state changed:', state);
     };
 
-    const stateChangedListener = EventRegister.addEventListener('stateChanged', handleStateChanged);
+    EventRegister.addEventListener('stateChanged', handleStateChanged);
     return () => {
       EventRegister.removeEventListener('stateChanged');
     };
@@ -141,7 +174,12 @@ const MainWindow: React.FC<MainWindowProps> = (props) => {
     const jpegq = parseInt(jpegQuality, 10);
     const qosvalue = parseInt(qosValue, 10) * 2;
 
-    EventRegister.emit('streamSettings', { screenPriority, priorityFactor, jpegq, qosvalue });
+    EventRegister.emit('streamSettings', {
+      screenPriority,
+      priorityFactor,
+      jpegq,
+      qosvalue,
+    });
 
     if (props.streaming) {
       props.hzModEnabled ? props.stopHzStream() : props.stopStream();
@@ -157,180 +195,286 @@ const MainWindow: React.FC<MainWindowProps> = (props) => {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContainer,
+          isTV && {padding: tvPadding(20), paddingHorizontal: OVERSCAN},
+        ]}>
         {/* Section: IP and Stream Control */}
-        <View style={styles.section}>
-          <Text style={styles.label}>IP Address</Text>
+        <View style={[styles.section, isTV && {padding: tvPadding(16)}]}>
+          <Text style={[styles.label, isTV && {fontSize: tvFontScale(16)}]}>
+            IP Address
+          </Text>
           <TextInput
+            ref={ipInputRef}
             style={styles.input}
             placeholder="DS IP Address"
-            placeholderTextColor="#888"
+            placeholderTextColor="#B0B0B0"
             value={dsIP}
             onChangeText={setDsIP}
+            accessibilityLabel="DS IP Address"
           />
-          <TouchableOpacity style={styles.button} onPress={handleStartStopStream}>
-            <Text style={styles.buttonText}>{props.streaming ? 'Stop Stream' : 'Start Stream'}</Text>
-          </TouchableOpacity>
+          <Focusable
+            style={[styles.button, isTV && styles.tvButton]}
+            onPress={handleStartStopStream}
+            accessibilityLabel={
+              props.streaming ? 'Stop Stream' : 'Start Stream'
+            }>
+            <Text
+              style={[styles.buttonText, isTV && {fontSize: tvFontScale(16)}]}>
+              {props.streaming ? 'Stop Stream' : 'Start Stream'}
+            </Text>
+          </Focusable>
         </View>
 
         {/* Section: Priority Settings */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Priority Factor</Text>
-          <View style={styles.priorityContainer}>
+        <View style={[styles.section, isTV && {padding: tvPadding(16)}]}>
+          <Text style={[styles.label, isTV && {fontSize: tvFontScale(16)}]}>
+            Priority Factor
+          </Text>
+          <View
+            accessible={true}
+            accessibilityLabel={`Priority Factor: ${priorityFactor}`}
+            accessibilityRole="adjustable"
+            style={styles.priorityContainer}>
             <Button
               title="-"
-              onPress={() => !props.hzModEnabled && setPriorityFactor((prev) => Math.max(prev - 1, 0))}
+              onPress={() =>
+                !props.hzModEnabled &&
+                setPriorityFactor(prev => Math.max(prev - 1, 0))
+              }
               disabled={props.hzModEnabled}
               color="#BB86FC"
+              accessibilityLabel="Decrease priority factor"
             />
             <TextInput
-              style={[styles.priorityInput, props.hzModEnabled && styles.disabledInput]}
+              style={[
+                styles.priorityInput,
+                props.hzModEnabled && styles.disabledInput,
+              ]}
               value={priorityFactor.toString()}
-              onChangeText={(text) => !props.hzModEnabled && setPriorityFactor(parseInt(text, 10))}
+              onChangeText={text =>
+                !props.hzModEnabled && setPriorityFactor(parseInt(text, 10))
+              }
               keyboardType="numeric"
               editable={!props.hzModEnabled}
+              accessibilityLabel="Priority Factor"
             />
             <Button
               title="+"
-              onPress={() => !props.hzModEnabled && setPriorityFactor((prev) => prev + 1)}
+              onPress={() =>
+                !props.hzModEnabled && setPriorityFactor(prev => prev + 1)
+              }
               disabled={props.hzModEnabled}
               color="#BB86FC"
+              accessibilityLabel="Increase priority factor"
             />
           </View>
 
-          <Text style={styles.label}>Screen Priority</Text>
+          <Text style={[styles.label, isTV && {fontSize: tvFontScale(16)}]}>
+            Screen Priority
+          </Text>
           <View style={styles.screenPriorityContainer}>
-            <TouchableOpacity
-              style={[styles.screenPriorityButton, screenPriority === 1 && styles.selectedButton]}
+            <Focusable
+              style={[
+                styles.screenPriorityButton,
+                screenPriority === 1 && styles.selectedButton,
+                isTV && styles.tvButton,
+              ]}
               onPress={() => !props.hzModEnabled && setScreenPriority(1)}
-            >
-              <Text style={styles.buttonText}>Top Screen</Text>
-            </TouchableOpacity>
-            {/* Only allow Bottom Screen selection if HzMod is disabled */}
-            <TouchableOpacity
+              accessibilityLabel="Top Screen priority">
+              <Text
+                style={[
+                  styles.buttonText,
+                  isTV && {fontSize: tvFontScale(16)},
+                ]}>
+                Top Screen
+              </Text>
+            </Focusable>
+            <Focusable
               style={[
                 styles.screenPriorityButton,
                 screenPriority === 0 && styles.selectedButton,
                 props.hzModEnabled && styles.disabledButton,
+                isTV && styles.tvButton,
               ]}
               onPress={() => !props.hzModEnabled && setScreenPriority(0)}
               disabled={props.hzModEnabled}
-            >
-              <Text style={styles.buttonText}>Bottom Screen</Text>
-            </TouchableOpacity>
+              accessibilityLabel="Bottom Screen priority">
+              <Text
+                style={[
+                  styles.buttonText,
+                  isTV && {fontSize: tvFontScale(16)},
+                ]}>
+                Bottom Screen
+              </Text>
+            </Focusable>
           </View>
         </View>
 
         {/* Section: JPEG and QoS Settings */}
-        <View style={styles.section}>
-          <Text style={styles.label}>JPEG Quality</Text>
+        <View style={[styles.section, isTV && {padding: tvPadding(16)}]}>
+          <Text style={[styles.label, isTV && {fontSize: tvFontScale(16)}]}>
+            JPEG Quality
+          </Text>
           <TextInput
             style={styles.input}
             placeholder="JPEG Quality"
-            placeholderTextColor="#888"
+            placeholderTextColor="#B0B0B0"
             keyboardType="numeric"
             value={jpegQuality}
-            onChangeText={(text) => {
+            onChangeText={text => {
               setJpegQuality(text);
               props.updateJpegQuality(parseInt(text, 10));
             }}
+            accessibilityLabel="JPEG Quality"
           />
 
           {props.hzModEnabled ? (
             <>
-              <Text style={styles.label}>CPU Limit</Text>
+              <Text style={[styles.label, isTV && {fontSize: tvFontScale(16)}]}>
+                CPU Limit
+              </Text>
               <TextInput
                 style={styles.input}
                 placeholder="CPU Limit"
-                placeholderTextColor="#888"
+                placeholderTextColor="#B0B0B0"
                 keyboardType="numeric"
                 value={props.cpuLimit.toString()}
-                onChangeText={(text) => {
+                onChangeText={text => {
                   const limit = parseInt(text, 10);
                   if (!isNaN(limit)) {
                     props.setCpuLimit(limit);
                     props.updateCpuLimit(limit);
                   }
                 }}
+                accessibilityLabel="CPU Limit"
               />
             </>
           ) : (
             <>
-              <Text style={styles.label}>QoS Value</Text>
+              <Text style={[styles.label, isTV && {fontSize: tvFontScale(16)}]}>
+                QoS Value
+              </Text>
               <TextInput
                 style={styles.input}
                 placeholder="QoS Value"
-                placeholderTextColor="#888"
+                placeholderTextColor="#B0B0B0"
                 keyboardType="numeric"
                 value={qosValue}
                 onChangeText={setQosValue}
+                accessibilityLabel="QoS Value"
               />
             </>
           )}
         </View>
 
         {/* Section: Additional Options */}
-        <View style={styles.section}>
+        <View style={[styles.section, isTV && {padding: tvPadding(16)}]}>
           <View style={styles.switchContainer}>
-            <Text style={styles.label}>Show FPS</Text>
-            <Switch value={showFps} onValueChange={setShowFps} />
+            <Text style={[styles.label, isTV && {fontSize: tvFontScale(16)}]}>
+              Show FPS
+            </Text>
+            <Switch
+              value={showFps}
+              onValueChange={setShowFps}
+              accessibilityLabel="Show FPS"
+            />
           </View>
           <View style={styles.switchContainer}>
-            <Text style={styles.label}>Enable Recording</Text>
-            <Switch value={props.recordingEnabled} onValueChange={props.setRecordingEnabled} />
+            <Text style={[styles.label, isTV && {fontSize: tvFontScale(16)}]}>
+              Enable Recording
+            </Text>
+            <Switch
+              value={props.recordingEnabled}
+              onValueChange={props.setRecordingEnabled}
+              accessibilityLabel="Enable Recording"
+            />
           </View>
           {props.recordingEnabled && (
             <>
-              <Text style={styles.label}>Recordings will be saved to:</Text>
+              <Text style={[styles.label, isTV && {fontSize: tvFontScale(16)}]}>
+                Recordings will be saved to:
+              </Text>
               <Text style={styles.directoryPath}>{recordingDirectory}</Text>
             </>
           )}
           <View style={styles.switchContainer}>
-            <Text style={styles.label}>HzMod</Text>
+            <Text style={[styles.label, isTV && {fontSize: tvFontScale(16)}]}>
+              HzMod
+            </Text>
             <Switch
               value={props.hzModEnabled}
-              onValueChange={(enabled) => {
+              onValueChange={enabled => {
                 props.setHzModEnabled(enabled);
-                // If HzMod is enabled, force bothViewEnabled to false.
                 if (enabled) {
                   setBothViewEnabled(false);
                 }
               }}
+              accessibilityLabel="HzMod"
             />
           </View>
-          {/* Both View Option is available only if HzMod is disabled */}
           <View style={styles.switchContainer}>
-            <Text style={styles.label}>Both View</Text>
+            <Text style={[styles.label, isTV && {fontSize: tvFontScale(16)}]}>
+              Both View
+            </Text>
             <Switch
               value={bothViewEnabled}
               onValueChange={setBothViewEnabled}
               disabled={props.hzModEnabled}
+              accessibilityLabel="Both View"
             />
           </View>
         </View>
 
         {/* Navigation Buttons */}
         {props.hzModEnabled ? (
-          // If HzMod is enabled, force top screen.
-          <TouchableOpacity style={styles.button} onPress={() => props.navigateToStreamWindow('top', showFps)}>
-            <Text style={styles.buttonText}>Go to Stream Window (Top)</Text>
-          </TouchableOpacity>
+          <Focusable
+            style={[styles.button, isTV && styles.tvButton]}
+            onPress={() => props.navigateToStreamWindow('top', showFps)}
+            accessibilityLabel="Go to Stream Window Top">
+            <Text
+              style={[styles.buttonText, isTV && {fontSize: tvFontScale(16)}]}>
+              Go to Stream Window (Top)
+            </Text>
+          </Focusable>
+        ) : bothViewEnabled ? (
+          <Focusable
+            style={[styles.button, isTV && styles.tvButton]}
+            onPress={() => props.navigateToStreamWindow('both', showFps)}
+            accessibilityLabel="Go to Stream Window Both">
+            <Text
+              style={[styles.buttonText, isTV && {fontSize: tvFontScale(16)}]}>
+              Go to Stream Window (Both)
+            </Text>
+          </Focusable>
         ) : (
-          // HzMod disabled: offer either both view or separate top/bottom.
-          bothViewEnabled ? (
-            <TouchableOpacity style={styles.button} onPress={() => props.navigateToStreamWindow('both', showFps)}>
-              <Text style={styles.buttonText}>Go to Stream Window (Both)</Text>
-            </TouchableOpacity>
-          ) : (
-            <>
-              <TouchableOpacity style={styles.button} onPress={() => props.navigateToStreamWindow('top', showFps)}>
-                <Text style={styles.buttonText}>Go to Stream Window (Top)</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.button} onPress={() => props.navigateToStreamWindow('bottom', showFps)}>
-                <Text style={styles.buttonText}>Go to Stream Window (Bottom)</Text>
-              </TouchableOpacity>
-            </>
-          )
+          <>
+            <Focusable
+              style={[styles.button, isTV && styles.tvButton]}
+              onPress={() => props.navigateToStreamWindow('top', showFps)}
+              accessibilityLabel="Go to Stream Window Top">
+              <Text
+                style={[
+                  styles.buttonText,
+                  isTV && {fontSize: tvFontScale(16)},
+                ]}>
+                Go to Stream Window (Top)
+              </Text>
+            </Focusable>
+            <Focusable
+              style={[styles.button, isTV && styles.tvButton]}
+              onPress={() => props.navigateToStreamWindow('bottom', showFps)}
+              accessibilityLabel="Go to Stream Window Bottom">
+              <Text
+                style={[
+                  styles.buttonText,
+                  isTV && {fontSize: tvFontScale(16)},
+                ]}>
+                Go to Stream Window (Bottom)
+              </Text>
+            </Focusable>
+          </>
         )}
       </ScrollView>
     </View>
@@ -423,6 +567,10 @@ const styles = StyleSheet.create({
     color: '#E0E0E0',
     fontSize: 14,
     marginTop: 4,
+  },
+  tvButton: {
+    paddingVertical: 20,
+    minHeight: 56,
   },
 });
 
