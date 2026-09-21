@@ -15,6 +15,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {EventRegister} from 'react-native-event-listeners';
 import RNFS from 'react-native-fs';
 import {Focusable, isTV, OVERSCAN, tvFontScale, tvPadding} from './tv';
+import Ionicons from '@react-native-vector-icons/ionicons';
+import HelpModal from './help/HelpModal';
 
 interface MainWindowProps {
   dsIP: string;
@@ -56,6 +58,7 @@ const MainWindow: React.FC<MainWindowProps> = props => {
   const [screenPriority, setScreenPriority] = useState<number>(1);
   const [showFps, setShowFps] = useState<boolean>(false);
   const [bothViewEnabled, setBothViewEnabled] = useState<boolean>(false);
+  const [helpVisible, setHelpVisible] = useState(false);
 
   const ipInputRef = useRef<TextInput>(null);
 
@@ -99,6 +102,20 @@ const MainWindow: React.FC<MainWindowProps> = props => {
         }
       } catch (error) {
         console.log('Error loading mainWindowSettings:', error);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const seen = await AsyncStorage.getItem('hasSeenTutorial');
+        if (seen !== 'true') {
+          setHelpVisible(true);
+          await AsyncStorage.setItem('hasSeenTutorial', 'true');
+        }
+      } catch (error) {
+        console.log('Error reading hasSeenTutorial:', error);
       }
     })();
   }, []);
@@ -195,6 +212,23 @@ const MainWindow: React.FC<MainWindowProps> = props => {
 
   return (
     <View style={styles.container}>
+      <View
+        style={[
+          styles.headerRow,
+          isTV && {paddingHorizontal: OVERSCAN, paddingTop: OVERSCAN},
+        ]}>
+        <Focusable
+          onPress={() => setHelpVisible(true)}
+          style={[styles.helpButton, isTV && styles.tvHelpButton]}
+          accessibilityLabel="Help"
+          accessibilityRole="button">
+          <Ionicons
+            name="help-circle-outline"
+            size={isTV ? 36 : 28}
+            color="#BB86FC"
+          />
+        </Focusable>
+      </View>
       <ScrollView
         contentContainerStyle={[
           styles.scrollContainer,
@@ -477,6 +511,7 @@ const MainWindow: React.FC<MainWindowProps> = props => {
           </>
         )}
       </ScrollView>
+      <HelpModal visible={helpVisible} onClose={() => setHelpVisible(false)} />
     </View>
   );
 };
@@ -572,6 +607,16 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     minHeight: 56,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  helpButton: {padding: 5},
+  tvHelpButton: {padding: 12},
 });
 
 export default MainWindow;
