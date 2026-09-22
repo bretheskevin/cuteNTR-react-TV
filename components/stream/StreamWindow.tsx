@@ -9,6 +9,7 @@ import {
   StatusBar,
   Alert,
   ActivityIndicator,
+  TVFocusGuideView,
 } from 'react-native';
 import {EventRegister} from 'react-native-event-listeners';
 import RNFS from 'react-native-fs';
@@ -504,6 +505,64 @@ class StreamWindow extends Component<StreamWindowProps, StreamWindowState> {
       exportProgress,
     } = this.state;
     const videoTransform = [{rotate: '0deg'}];
+    const topBar = (
+      <View
+        style={[
+          styles.topBar,
+          isTV && {paddingHorizontal: OVERSCAN, paddingTop: OVERSCAN},
+        ]}>
+        <Focusable
+          onPress={this.handleBackPress}
+          style={[styles.iconButton, isTV && styles.tvIcon]}
+          accessibilityLabel="Go back"
+          hasTVPreferredFocus={true}>
+          <Ionicons name="arrow-back" size={28} color="#FFF" />
+        </Focusable>
+        <Focusable
+          onPress={this.toggleFullscreen}
+          style={[styles.iconButton, isTV && styles.tvIcon]}
+          accessibilityLabel={
+            fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'
+          }>
+          <Ionicons
+            name={fullscreen ? 'contract' : 'expand'}
+            size={28}
+            color="#FFF"
+          />
+        </Focusable>
+      </View>
+    );
+    const bottomBar = (
+      <View
+        style={[
+          styles.bottomBar,
+          isTV && {paddingHorizontal: OVERSCAN, paddingBottom: OVERSCAN},
+        ]}>
+        {this.props.showFps && !this.props.bothViewEnabled && (
+          <View
+            style={styles.fpsContainer}
+            accessibilityLabel={`Frames per second: ${fps}`}
+            accessibilityRole="text">
+            <Ionicons name="speedometer" size={20} color="#FFF" />
+            <Text style={styles.fpsText}>FPS: {fps}</Text>
+          </View>
+        )}
+        {this.props.recordingEnabled && (
+          <Focusable
+            style={[styles.recordButton, isTV && styles.tvIcon]}
+            onPress={this.handleRecordButton}
+            accessibilityLabel={
+              recording ? 'Stop recording' : 'Start recording'
+            }>
+            <Ionicons
+              name={recording ? 'stop-circle' : 'radio-button-on'}
+              size={40}
+              color={recording ? '#CF6679' : '#FF1744'}
+            />
+          </Focusable>
+        )}
+      </View>
+    );
     return (
       <View style={fullscreen ? styles.fullscreenContainer : styles.container}>
         <StatusBar hidden={fullscreen} />
@@ -544,64 +603,22 @@ class StreamWindow extends Component<StreamWindowProps, StreamWindowState> {
             frame={currentFrame}
           />
         )}
-        {!fullscreen && (
-          <View
-            style={[
-              styles.topBar,
-              isTV && {paddingHorizontal: OVERSCAN, paddingTop: OVERSCAN},
-            ]}>
-            <Focusable
-              onPress={this.handleBackPress}
-              style={[styles.iconButton, isTV && styles.tvIcon]}
-              accessibilityLabel="Go back"
-              hasTVPreferredFocus={true}>
-              <Ionicons name="arrow-back" size={28} color="#FFF" />
-            </Focusable>
-            <Focusable
-              onPress={this.toggleFullscreen}
-              style={[styles.iconButton, isTV && styles.tvIcon]}
-              accessibilityLabel={
-                fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'
-              }>
-              <Ionicons
-                name={fullscreen ? 'contract' : 'expand'}
-                size={28}
-                color="#FFF"
-              />
-            </Focusable>
-          </View>
-        )}
-        {!fullscreen && (
-          <View
-            style={[
-              styles.bottomBar,
-              isTV && {paddingHorizontal: OVERSCAN, paddingBottom: OVERSCAN},
-            ]}>
-            {this.props.showFps && !this.props.bothViewEnabled && (
-              <View
-                style={styles.fpsContainer}
-                accessibilityLabel={`Frames per second: ${fps}`}
-                accessibilityRole="text">
-                <Ionicons name="speedometer" size={20} color="#FFF" />
-                <Text style={styles.fpsText}>FPS: {fps}</Text>
-              </View>
-            )}
-            {this.props.recordingEnabled && (
-              <Focusable
-                style={[styles.recordButton, isTV && styles.tvIcon]}
-                onPress={this.handleRecordButton}
-                accessibilityLabel={
-                  recording ? 'Stop recording' : 'Start recording'
-                }>
-                <Ionicons
-                  name={recording ? 'stop-circle' : 'radio-button-on'}
-                  size={40}
-                  color={recording ? '#CF6679' : '#FF1744'}
-                />
-              </Focusable>
-            )}
-          </View>
-        )}
+        {!fullscreen &&
+          (isTV ? (
+            <TVFocusGuideView
+              autoFocus
+              style={StyleSheet.absoluteFill}
+              pointerEvents="box-none">
+              {topBar}
+              <View style={{flex: 1}} />
+              {bottomBar}
+            </TVFocusGuideView>
+          ) : (
+            <>
+              {topBar}
+              {bottomBar}
+            </>
+          ))}
         {isExporting && (
           <View style={styles.exportOverlay}>
             <ActivityIndicator size="large" color="#FF1744" />

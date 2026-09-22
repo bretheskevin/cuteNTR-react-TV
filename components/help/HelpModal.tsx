@@ -1,5 +1,12 @@
 import React from 'react';
-import {Modal, View, Text, ScrollView, StyleSheet} from 'react-native';
+import {
+  Modal,
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  TVFocusGuideView,
+} from 'react-native';
 import {Focusable, isTV, OVERSCAN, tvFontScale, tvPadding} from '../tv';
 
 interface HelpModalProps {
@@ -19,6 +26,59 @@ const TROUBLESHOOTING_ITEMS = [
 ];
 
 const HelpModal: React.FC<HelpModalProps> = ({visible, onClose}) => {
+  const cardContent = (
+    <View
+      style={[
+        styles.card,
+        isTV && {
+          padding: tvPadding(24),
+          marginHorizontal: OVERSCAN,
+          marginVertical: OVERSCAN,
+        },
+      ]}>
+      <Text
+        style={[styles.title, isTV && {fontSize: tvFontScale(22)}]}
+        accessibilityRole="header">
+        How to use AdorableNTR
+      </Text>
+      <ScrollView style={styles.scrollArea}>
+        <Text
+          style={[styles.sectionHeading, isTV && {fontSize: tvFontScale(18)}]}
+          accessibilityRole="header">
+          Usage
+        </Text>
+        {USAGE_STEPS.map((step, index) => (
+          <Text
+            key={index}
+            style={[styles.body, isTV && {fontSize: tvFontScale(14)}]}>
+            {step}
+          </Text>
+        ))}
+        <Text
+          style={[styles.sectionHeading, isTV && {fontSize: tvFontScale(18)}]}
+          accessibilityRole="header">
+          Troubleshooting
+        </Text>
+        {TROUBLESHOOTING_ITEMS.map((item, index) => (
+          <Text
+            key={index}
+            style={[styles.body, isTV && {fontSize: tvFontScale(14)}]}>
+            {item}
+          </Text>
+        ))}
+      </ScrollView>
+      <Focusable
+        style={[styles.closeButton, isTV && styles.tvCloseButton]}
+        onPress={onClose}
+        accessibilityLabel="Close"
+        hasTVPreferredFocus={true}>
+        <Text
+          style={[styles.closeButtonText, isTV && {fontSize: tvFontScale(16)}]}>
+          Close
+        </Text>
+      </Focusable>
+    </View>
+  );
   return (
     <Modal
       transparent
@@ -26,66 +86,13 @@ const HelpModal: React.FC<HelpModalProps> = ({visible, onClose}) => {
       visible={visible}
       onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View
-          style={[
-            styles.card,
-            isTV && {
-              padding: tvPadding(24),
-              marginHorizontal: OVERSCAN,
-              marginVertical: OVERSCAN,
-            },
-          ]}>
-          <Text
-            style={[styles.title, isTV && {fontSize: tvFontScale(22)}]}
-            accessibilityRole="header">
-            How to use AdorableNTR
-          </Text>
-          <ScrollView style={styles.scrollArea}>
-            <Text
-              style={[
-                styles.sectionHeading,
-                isTV && {fontSize: tvFontScale(18)},
-              ]}
-              accessibilityRole="header">
-              Usage
-            </Text>
-            {USAGE_STEPS.map((step, index) => (
-              <Text
-                key={index}
-                style={[styles.body, isTV && {fontSize: tvFontScale(14)}]}>
-                {step}
-              </Text>
-            ))}
-            <Text
-              style={[
-                styles.sectionHeading,
-                isTV && {fontSize: tvFontScale(18)},
-              ]}
-              accessibilityRole="header">
-              Troubleshooting
-            </Text>
-            {TROUBLESHOOTING_ITEMS.map((item, index) => (
-              <Text
-                key={index}
-                style={[styles.body, isTV && {fontSize: tvFontScale(14)}]}>
-                {item}
-              </Text>
-            ))}
-          </ScrollView>
-          <Focusable
-            style={[styles.closeButton, isTV && styles.tvCloseButton]}
-            onPress={onClose}
-            accessibilityLabel="Close"
-            hasTVPreferredFocus={true}>
-            <Text
-              style={[
-                styles.closeButtonText,
-                isTV && {fontSize: tvFontScale(16)},
-              ]}>
-              Close
-            </Text>
-          </Focusable>
-        </View>
+        {isTV ? (
+          <TVFocusGuideView autoFocus style={styles.tvFocusGuide}>
+            {cardContent}
+          </TVFocusGuideView>
+        ) : (
+          cardContent
+        )}
       </View>
     </Modal>
   );
@@ -135,6 +142,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tvCloseButton: {paddingVertical: 20, minHeight: 56},
+  tvFocusGuide: {
+    flex: 1,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   closeButtonText: {color: '#FFFFFF', fontWeight: '600', fontSize: 16},
 });
 

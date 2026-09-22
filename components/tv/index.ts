@@ -8,3 +8,6 @@ export {
   tvPadding,
 } from './tvTheme';
 export {default as Focusable} from './Focusable';
+export {default as FocusableSwitch} from './FocusableSwitch';
+export {default as FocusableButton} from './FocusableButton';
+export {TVFocusGuideView} from 'react-native';
