@@ -28,7 +28,7 @@
     "ffmpeg-kit-react-native": "^6.0.2",
     "hermes-engine": "^0.11.0",
     "react": "18.2.0",
-    "react-native": "^0.74.2",
+    "react-native": "npm:react-native-tvos@0.74.5-0",
     "react-native-document-picker": "^9.3.0",
     "react-native-event-listeners": "^1.0.7",
     "react-native-fast-image": "^8.6.3",
