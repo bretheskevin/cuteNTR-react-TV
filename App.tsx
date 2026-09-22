@@ -1,17 +1,22 @@
-import React, { Component } from 'react';
-import { 
-  View, 
-  StyleSheet, 
-  AppState, 
-  Platform, 
-  PermissionsAndroid 
+import React, {Component} from 'react';
+import {
+  View,
+  StyleSheet,
+  AppState,
+  Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MainWindow from './components/MainWindow';
 import Ntr from './components/ntr/Ntr';
 import StreamWorker from './components/stream/StreamWorker';
 import HzMod from './components/hzmod/HzMod';
-import { EventRegister } from 'react-native-event-listeners';
+import {EventRegister} from 'react-native-event-listeners';
+import UpdateModal from './components/update/UpdateModal';
+import {
+  checkForUpdate,
+  downloadAndInstall,
+} from './components/update/UpdateChecker';
 
 interface AppComponentState {
   dsIP: string;
@@ -33,6 +38,11 @@ interface AppComponentState {
   cpuLimit: number;
   hzConnected: boolean;
   hzDisconnected: boolean;
+  updateAvailable: boolean;
+  updateVersionName: string;
+  updateApkUrl: string;
+  updateDownloading: boolean;
+  updateProgress: number;
 }
 
 class App extends Component<{}, AppComponentState> {
@@ -62,6 +72,11 @@ class App extends Component<{}, AppComponentState> {
       cpuLimit: 0,
       hzConnected: false,
       hzDisconnected: true,
+      updateAvailable: false,
+      updateVersionName: '',
+      updateApkUrl: '',
+      updateDownloading: false,
+      updateProgress: 0,
     };
 
     this.startStream = this.startStream.bind(this);
@@ -83,19 +98,59 @@ class App extends Component<{}, AppComponentState> {
   }
 
   componentDidMount() {
-    this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
-    this.stateChangedListener = EventRegister.addEventListener('stateChanged', (state: string) => this.handleStreamStateChanged(state));
-    this.ntrStateChangedListener = EventRegister.addEventListener('ntrStateChanged', (state: string) => this.handleNtrStateChanged(state));
+    this.appStateSubscription = AppState.addEventListener(
+      'change',
+      this.handleAppStateChange,
+    );
+    this.stateChangedListener = EventRegister.addEventListener(
+      'stateChanged',
+      (state: string) => this.handleStreamStateChanged(state),
+    );
+    this.ntrStateChangedListener = EventRegister.addEventListener(
+      'ntrStateChanged',
+      (state: string) => this.handleNtrStateChanged(state),
+    );
 
     // Load persisted settings (if any) and request storage permission initially.
     this.loadSettings();
     this.requestStoragePermission();
+    checkForUpdate()
+      .then(info => {
+        if (info) {
+          this.setState({
+            updateAvailable: true,
+            updateVersionName: info.versionName,
+            updateApkUrl: info.apkUrl,
+          });
+        }
+      })
+      .catch(() => {});
   }
 
-  componentDidUpdate(prevProps: {}, prevState: AppComponentState) {
+  componentDidUpdate(_prevProps: {}, _prevState: AppComponentState) {
     // Persist selected settings so they survive an app restart.
-    const { dsIP, qosValue, priMode, priFact, jpegQuality, recordingEnabled, recordingPath, hzModEnabled, cpuLimit } = this.state;
-    const settings = { dsIP, qosValue, priMode, priFact, jpegQuality, recordingEnabled, recordingPath, hzModEnabled, cpuLimit };
+    const {
+      dsIP,
+      qosValue,
+      priMode,
+      priFact,
+      jpegQuality,
+      recordingEnabled,
+      recordingPath,
+      hzModEnabled,
+      cpuLimit,
+    } = this.state;
+    const settings = {
+      dsIP,
+      qosValue,
+      priMode,
+      priFact,
+      jpegQuality,
+      recordingEnabled,
+      recordingPath,
+      hzModEnabled,
+      cpuLimit,
+    };
     AsyncStorage.setItem('appSettings', JSON.stringify(settings)).catch(error =>
       console.error('Failed to save settings:', error),
     );
@@ -157,7 +212,7 @@ class App extends Component<{}, AppComponentState> {
     }
   };
 
-  handleAppStateChange(nextAppState: string) {
+  handleAppStateChange(_nextAppState: string) {
     /* Uncomment if you want to stop the stream when the app goes to the background:
     if (nextAppState.match(/inactive|background/)) {
       this.stopStream();
@@ -167,21 +222,25 @@ class App extends Component<{}, AppComponentState> {
 
   handleNtrStateChanged(state: string) {
     if (state === 'Connected') {
-      this.setState({ debugging: true });
+      this.setState({debugging: true});
       if (!this.state.remotePlayInitiated) {
-        this.setState({ remotePlayInitiated: true });
+        this.setState({remotePlayInitiated: true});
         EventRegister.emit('ntrCommand', {
           command: 901,
         });
       }
     } else if (state === 'Disconnected') {
-      this.setState({ debugging: false });
+      this.setState({debugging: false});
     }
   }
 
   handleStreamStateChanged(state: string) {
     if (state === 'Connected') {
-      this.setState({ streaming: true, hzConnected: false, hzDisconnected: false });
+      this.setState({
+        streaming: true,
+        hzConnected: false,
+        hzDisconnected: false,
+      });
       EventRegister.emit('ntrConnectToDs');
     } else if (state === 'Disconnected') {
       this.setState({
@@ -212,7 +271,7 @@ class App extends Component<{}, AppComponentState> {
     console.log('startHzStream called');
     if (!this.state.hzStreaming) {
       EventRegister.emit('hzStream');
-      this.setState({ hzStreaming: true });
+      this.setState({hzStreaming: true});
     }
   }
 
@@ -220,7 +279,7 @@ class App extends Component<{}, AppComponentState> {
     console.log('stopHzStream called');
     if (this.state.hzStreaming) {
       EventRegister.emit('stopHzStream');
-      this.setState({ hzStreaming: false });
+      this.setState({hzStreaming: false});
     }
   }
 
@@ -238,61 +297,86 @@ class App extends Component<{}, AppComponentState> {
 
   navigateBack() {
     console.log('Navigating back to Home');
-    this.setState({ currentScreen: 'Home' });
+    this.setState({currentScreen: 'Home'});
     // Do not stop the stream here
   }
 
   updateDsIP(dsIP: string) {
-    this.setState({ dsIP });
+    this.setState({dsIP});
   }
 
   updateJpegQuality(jpegQuality: number) {
-    this.setState({ jpegQuality });
+    this.setState({jpegQuality});
   }
 
   updateCpuLimit(cpuLimit: number) {
-    this.setState({ cpuLimit });
+    this.setState({cpuLimit});
   }
 
   setRecordingEnabled(enabled: boolean) {
-    this.setState({ recordingEnabled: enabled });
+    this.setState({recordingEnabled: enabled});
   }
 
   setRecordingPath(path: string) {
-    this.setState({ recordingPath: path });
+    this.setState({recordingPath: path});
   }
 
   setHzModEnabled(enabled: boolean) {
-    this.setState({ hzModEnabled: enabled });
+    this.setState({hzModEnabled: enabled});
   }
 
   setCpuLimit(limit: number) {
-    this.setState({ cpuLimit: limit });
+    this.setState({cpuLimit: limit});
   }
 
+  handleUpdate = () => {
+    this.setState({updateDownloading: true, updateProgress: 0});
+    downloadAndInstall(this.state.updateApkUrl, percent => {
+      this.setState({updateProgress: percent});
+    })
+      .then(() => {
+        this.setState({updateDownloading: false});
+      })
+      .catch(() => {
+        this.setState({
+          updateDownloading: false,
+          updateProgress: 0,
+          updateAvailable: false,
+        });
+      });
+  };
+
+  handleUpdateLater = () => {
+    this.setState({updateAvailable: false});
+  };
+
   render() {
-    const { 
-      currentScreen, 
-      isTop, 
-      streamMode, 
-      dsIP, 
-      streaming, 
-      hzStreaming, 
-      priMode, 
-      priFact, 
-      jpegQuality, 
-      qosValue, 
-      showFps, 
-      recordingEnabled, 
-      recordingPath, 
-      hzModEnabled, 
-      cpuLimit, 
-      hzConnected, 
-      hzDisconnected 
+    const {
+      currentScreen,
+      isTop,
+      streamMode,
+      dsIP,
+      streaming,
+      hzStreaming,
+      priMode,
+      priFact,
+      jpegQuality,
+      qosValue,
+      showFps,
+      recordingEnabled,
+      hzModEnabled,
+      cpuLimit,
+      hzConnected,
+      hzDisconnected,
+      updateAvailable,
+      updateVersionName,
+      updateDownloading,
+      updateProgress,
     } = this.state;
 
     // Choose the platform-specific StreamWindow component.
-    const StreamWindowComponent = require('./components/stream/StreamWindow').default;
+    const StreamWindowComponent =
+      require('./components/stream/StreamWindow').default;
 
     return (
       <View style={styles.container}>
@@ -337,9 +421,27 @@ class App extends Component<{}, AppComponentState> {
           />
         )}
         {/* Ntr and StreamWorker are only rendered when HzMod is disabled */}
-        {!hzModEnabled && <Ntr dsIP={dsIP} screenPriority={priMode} priFact={priFact} jpegq={jpegQuality} qosvalue={qosValue} />}
+        {!hzModEnabled && (
+          <Ntr
+            dsIP={dsIP}
+            screenPriority={priMode}
+            priFact={priFact}
+            jpegq={jpegQuality}
+            qosvalue={qosValue}
+          />
+        )}
         {!hzModEnabled && <StreamWorker dsIP={dsIP} />}
-        {hzModEnabled && <HzMod cpuLimit={cpuLimit} jpegQuality={jpegQuality} dsIP={dsIP} />}
+        {hzModEnabled && (
+          <HzMod cpuLimit={cpuLimit} jpegQuality={jpegQuality} dsIP={dsIP} />
+        )}
+        <UpdateModal
+          visible={updateAvailable}
+          versionName={updateVersionName}
+          downloading={updateDownloading}
+          progress={updateProgress}
+          onUpdate={this.handleUpdate}
+          onLater={this.handleUpdateLater}
+        />
       </View>
     );
   }

@@ -29,6 +29,9 @@ class MainApplication : Application(), ReactApplication {
           if (packages.none { it is VideoStreamPackage }) {
             packages.add(VideoStreamPackage())
           }
+          if (packages.none { it is AppUpdatePackage }) {
+            packages.add(AppUpdatePackage())
+          }
 
           return packages
         }

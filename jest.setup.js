@@ -13,6 +13,7 @@ jest.mock('react-native-event-listeners', () => ({
 jest.mock('react-native-fs', () => ({
   DocumentDirectoryPath: '/mock/documents',
   ExternalDirectoryPath: '/mock/external',
+  CachesDirectoryPath: '/mock/caches',
   readDir: jest.fn(() => Promise.resolve([])),
   readFile: jest.fn(() => Promise.resolve('')),
   writeFile: jest.fn(() => Promise.resolve()),
@@ -55,3 +56,11 @@ jest.mock('ffmpeg-kit-react-native', () => ({
 }));
 
 jest.mock('@react-native-vector-icons/ionicons', () => 'Ionicons');
+
+const {NativeModules} = require('react-native');
+
+NativeModules.AppUpdate = {
+  getVersionCode: jest.fn(() => Promise.resolve(10000)),
+  getVersionName: jest.fn(() => Promise.resolve('1.0.0')),
+  installApk: jest.fn(() => Promise.resolve(null)),
+};

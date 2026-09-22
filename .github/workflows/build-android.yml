@@ -43,8 +43,31 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
+      - name: Compute version from tag
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            TAG="${{ github.ref_name }}"
+            VN="${TAG#v}"
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$VN"
+            VC=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+            echo "version_name=$VN" >> "$GITHUB_OUTPUT"
+            echo "version_code=$VC" >> "$GITHUB_OUTPUT"
+            echo "has_version=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_version=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build release APK
-        run: cd android && ./gradlew assembleRelease --no-daemon
+        run: |
+          cd android
+          if [[ "${{ steps.version.outputs.has_version }}" == "true" ]]; then
+            ./gradlew assembleRelease --no-daemon \
+              -PversionName="${{ steps.version.outputs.version_name }}" \
+              -PversionCode="${{ steps.version.outputs.version_code }}"
+          else
+            ./gradlew assembleRelease --no-daemon
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
