@@ -63,7 +63,7 @@ const MainWindow: React.FC<MainWindowProps> = props => {
   const [priorityFactor, setPriorityFactor] = useState<number>(props.priFact);
   const [screenPriority, setScreenPriority] = useState<number>(1);
   const [showFps, setShowFps] = useState<boolean>(false);
-  const [bothViewEnabled, setBothViewEnabled] = useState<boolean>(false);
+  const [bothViewEnabled, setBothViewEnabled] = useState<boolean>(true);
   const [helpVisible, setHelpVisible] = useState(false);
 
   useEffect(() => {
