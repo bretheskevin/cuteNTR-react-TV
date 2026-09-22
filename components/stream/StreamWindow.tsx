@@ -569,7 +569,12 @@ class StreamWindow extends Component<StreamWindowProps, StreamWindowState> {
         {this.props.bothViewEnabled ? (
           <View
             style={[styles.splitContainer, isTV && styles.splitContainerTv]}>
-            <View style={[styles.splitSection, isTV && styles.splitSectionTv]}>
+            <View
+              style={[
+                styles.splitSection,
+                isTV && styles.splitSectionTv,
+                isTV && styles.splitSectionTvTop,
+              ]}>
               <SingletonJpegVideoView
                 style={[styles.video, {transform: videoTransform}]}
                 frame={currentFrameTop}
@@ -583,7 +588,12 @@ class StreamWindow extends Component<StreamWindowProps, StreamWindowState> {
                 </Text>
               )}
             </View>
-            <View style={[styles.splitSection, isTV && styles.splitSectionTv]}>
+            <View
+              style={[
+                styles.splitSection,
+                isTV && styles.splitSectionTv,
+                isTV && styles.splitSectionTvBottom,
+              ]}>
               <SingletonJpegVideoView
                 style={[styles.video, {transform: videoTransform}]}
                 frame={currentFrameBottom}
@@ -685,6 +695,8 @@ const styles = StyleSheet.create({
   splitContainerTv: {flexDirection: 'row'},
   splitSection: {flex: 1, borderBottomWidth: 1, borderColor: '#333'},
   splitSectionTv: {borderBottomWidth: 0, borderRightWidth: 1},
+  splitSectionTvTop: {flex: 5},
+  splitSectionTvBottom: {flex: 4},
   tvIcon: {padding: 12},
 });
 
