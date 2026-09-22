@@ -567,8 +567,9 @@ class StreamWindow extends Component<StreamWindowProps, StreamWindowState> {
       <View style={fullscreen ? styles.fullscreenContainer : styles.container}>
         <StatusBar hidden={fullscreen} />
         {this.props.bothViewEnabled ? (
-          <View style={styles.splitContainer}>
-            <View style={styles.splitSection}>
+          <View
+            style={[styles.splitContainer, isTV && styles.splitContainerTv]}>
+            <View style={[styles.splitSection, isTV && styles.splitSectionTv]}>
               <SingletonJpegVideoView
                 style={[styles.video, {transform: videoTransform}]}
                 frame={currentFrameTop}
@@ -582,7 +583,7 @@ class StreamWindow extends Component<StreamWindowProps, StreamWindowState> {
                 </Text>
               )}
             </View>
-            <View style={styles.splitSection}>
+            <View style={[styles.splitSection, isTV && styles.splitSectionTv]}>
               <SingletonJpegVideoView
                 style={[styles.video, {transform: videoTransform}]}
                 frame={currentFrameBottom}
@@ -681,7 +682,9 @@ const styles = StyleSheet.create({
   },
   exportProgressText: {marginTop: 10, fontSize: 18, color: '#FFF'},
   splitContainer: {flex: 1},
+  splitContainerTv: {flexDirection: 'row'},
   splitSection: {flex: 1, borderBottomWidth: 1, borderColor: '#333'},
+  splitSectionTv: {borderBottomWidth: 0, borderRightWidth: 1},
   tvIcon: {padding: 12},
 });
 
