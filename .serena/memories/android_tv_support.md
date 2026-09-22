@@ -1,6 +1,14 @@
 # Android TV + accessibility support
 
-Added 2026-09-21. App made usable on **Android TV** (D-pad, Leanback launcher, 10-foot UI) + general a11y fixes. Android TV only — deliberately NOT migrated to `react-native-tvos`; iOS untouched. Same APK runs phone + TV.
+Added 2026-09-21. App made usable on **Android TV** (D-pad, Leanback launcher, 10-foot UI) + general a11y fixes. Same APK runs phone + TV.
+
+## Phase A migration (2026-09-22): react-native-tvos fork
+- `react-native` dependency replaced with npm alias `npm:react-native-tvos@0.74.5-0` in package.json (NO JS import changes needed).
+- `npm install --legacy-peer-deps` required (peer deps check for `^0.0.0-0 || >=0.65 <1.0` which the alias version string `0.74.5-0` doesn't satisfy). CI workflow updated accordingly.
+- `jest.config.js` needed `transformIgnorePatterns` override to include `@react-native-tvos` (ships ESM; `@react-native-tvos/virtualized-lists` was failing Jest parse).
+- `android/app/build.gradle` changed from `com.facebook.react:react-android`/`hermes-android` to `io.github.react-native-tvos:react-android`/`hermes-android` (following fork template; fork's gradle plugin also handles this via substitution from `node_modules/react-native/ReactAndroid/gradle.properties` → `react.internal.publishingGroup=io.github.react-native-tvos`).
+- `android/build.gradle` and `android/settings.gradle` UNCHANGED — includeBuild picks up fork's gradle plugin transparently; ffmpeg-kit substitution preserved.
+- CI gate: `assembleRelease` in GitHub Actions verifies the Android build (not run locally — times out).
 
 ## Key gotcha (verified against node_modules)
 - **Stock `react-native` 0.74 DOES expose `Platform.isTV`** — `Platform.android.js` has `get isTV() { return this.constants.uiMode === 'tv'; }`. So TV detection needs NO fork and NO native module. `components/tv/tv.ts` is just `Platform.isTV === true`.
@@ -23,6 +31,19 @@ App.tsx switches screens by ternary → each screen fully remounts, so per-scree
 
 ## NOT verifiable without a real Android TV (user must test)
 D-pad focus routing, focus-ring visibility, ScrollView auto-scroll-to-focus, RN `Switch` D-pad reachability (fallback: wrap the switch row in `Focusable` with role "switch" toggling the value), `gradlew assembleDebug` (times out in sandbox; run locally).
+
+## Phase B (part 1) — TV focus components (2026-09-22)
+- `components/tv/FocusableSwitch.tsx` — D-pad focusable Switch row (wraps Focusable on TV, plain View on phone). Import: `import Focusable from './Focusable'` (default export — plan snippets show `{Focusable}` which is WRONG).
+- `components/tv/FocusableButton.tsx` — D-pad focusable styled button for +/- controls.
+- `components/tv/index.ts` — now also exports FocusableSwitch, FocusableButton, and TVFocusGuideView (re-exported from 'react-native').
+- `components/MainWindow.tsx` changes:
+  - Removed `InteractionManager` auto-focus trap on IP TextInput; removed `ipInputRef` and `useRef`.
+  - Added `hasTVPreferredFocus={isTV}` to Start Stream Focusable button.
+  - Replaced 4 bare Switch controls with FocusableSwitch.
+  - Replaced 2 bare Button +/- controls with FocusableButton.
+  - Removed `accessible={true}` + `accessibilityRole="adjustable"` from priority row View.
+  - Wrapped ScrollView in `<TVFocusGuideView autoFocus>`.
+- `TVFocusGuideView` IS typed in the fork: `node_modules/react-native/types/public/ReactNativeTVTypes.d.ts` (line 126) — safe to import from 'react-native'.
 
 ## Deferred
 Removing dead deps `react-native-orientation-locker` + `react-native-immersive` (grep-confirmed unused) — skipped to avoid iOS native-linking churn. See `mem:core`, `mem:tech_stack`.
