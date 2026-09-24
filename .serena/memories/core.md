@@ -13,6 +13,10 @@ React Native 0.74 app that streams Nintendo 3DS video over TCP/UDP (BootNTR / Hz
 
 - `components/tv/` — TV foundation module (Task 1). Exports: `isTV` (boolean, Platform.isTV-based), theme constants (`FOCUS_RING_COLOR` #BB86FC, `FOCUS_RING_WIDTH` 3, `OVERSCAN`, `TV_MIN_TARGET_SIZE`, `tvFontScale`, `tvPadding`), and `Focusable` wrapper (functional component with D-pad focus ring). Android TV only; no native module needed (Platform.isTV reliable in RN 0.74 via uiMode==='tv').
 
+- `components/update/UpdateChecker.ts` — JS service: fetches GitHub Releases API, compares versionCodes (formula: X*10000+Y*100+Z), downloads APK via RNFS to CachesDirectoryPath, calls `NativeModules.AppUpdate.installApk`. Android-only (returns null on other platforms). `NativeModules.AppUpdate` guarded for undefined. All errors caught → returns null (offline gate).
+- `components/update/UpdateModal.tsx` — Modal UI mirroring HelpModal: "Update now" (hasTVPreferredFocus) + "Later" Focusable buttons, download progress with ActivityIndicator, TVFocusGuideView gated by isTV, onRequestClose→onLater.
+- In-app update wired in `App.tsx`: `componentDidMount` calls `checkForUpdate()` non-blocking; new state fields `updateAvailable/updateVersionName/updateApkUrl/updateDownloading/updateProgress`; handlers `handleUpdate`/`handleUpdateLater` (arrow functions); `<UpdateModal>` rendered at root View bottom.
+
 ## Invariants
 - Do NOT introduce react-navigation for routing; App.tsx conditional rendering is the established pattern.
 - Settings persistence happens in `App.componentDidUpdate` — add new persisted settings to that object or they silently won't save.
